@@ -9,7 +9,7 @@ Sistema de evaluación de reglas de negocio para reservas aéreas desarrollado c
 * **Build Tool:** Maven 3.6+.
 
 ## Estructura del Proyecto
-* `droolsrules`: Módulo con la configuración base y dependencias del motor Drools.
+* `droolsrules`: código realizado por el profesor en la práctica.
 * `airline-project`: Implementación de la lógica de negocio, modelos (POJOs), controladores REST y archivos de reglas (`.drl`).
 
 ---
