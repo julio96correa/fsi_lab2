@@ -1,0 +1,179 @@
+package rules
+
+import com.udea.droolrules.model.Passenger
+import com.udea.droolrules.model.Flight
+import com.udea.droolrules.model.Luggage
+import com.udea.droolrules.model.BookingRequest
+import com.udea.droolrules.model.BookingResponse
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regla 1: UpgradeToBusinessClassForFrequentFlyersWithDelays
+// Condición : Pasajero con estatus Gold o Platinum + retraso > 60 minutos
+// Acción    : Ascender a clase ejecutiva (Business)
+// ─────────────────────────────────────────────────────────────────────────────
+rule "UpgradeToBusinessClassForFrequentFlyersWithDelays"
+    when
+        $req  : BookingRequest(
+                    passenger.membershipStatus in ("Gold", "Platinum"),
+                    flight.delayMinutes > 60
+                )
+        $resp : BookingResponse()
+    then
+        $resp.setUpgradeClass("Business");
+        $resp.addMessage("Regla 1 activada: Pasajero ascendido a clase Business por retraso de "
+                + $req.getFlight().getDelayMinutes() + " minutos y membresía "
+                + $req.getPassenger().getMembershipStatus() + ".");
+end
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regla 2: PriorityCheckInForSeniors
+// Condición : Pasajero mayor de 65 años
+// Acción    : Activar check-in prioritario
+// ─────────────────────────────────────────────────────────────────────────────
+rule "PriorityCheckInForSeniors"
+    when
+        $req  : BookingRequest(passenger.age > 65)
+        $resp : BookingResponse()
+    then
+        $resp.setPriorityCheckIn(true);
+        $resp.addMessage("Regla 2 activada: Check-in prioritario asignado por ser mayor de 65 años ("
+                + $req.getPassenger().getAge() + " años).");
+end
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regla 3: DiscountForLightLuggage
+// Condición : Equipaje con peso menor a 10 kg
+// Acción    : Aplicar descuento del 10%
+// ─────────────────────────────────────────────────────────────────────────────
+rule "DiscountForLightLuggage"
+    when
+        $req  : BookingRequest(luggage.weightKg < 10)
+        $resp : BookingResponse()
+    then
+        $resp.setDiscountPercent(10.0);
+        $resp.addMessage("Regla 3 activada: Descuento del 10% aplicado por equipaje ligero ("
+                + $req.getLuggage().getWeightKg() + " kg).");
+end
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regla 4: DenyUpgradeForOverweightLuggage
+// Condición : Equipaje mayor a 23 kg
+// Acción    : Marcar al pasajero como no elegible para ascensos
+// ─────────────────────────────────────────────────────────────────────────────
+rule "DenyUpgradeForOverweightLuggage"
+    when
+        $req  : BookingRequest(luggage.weightKg > 23)
+        $resp : BookingResponse()
+    then
+        $resp.setEligibleForUpgrade(false);
+        $resp.addMessage("Regla 4 activada: Pasajero NO elegible para ascenso por exceso de equipaje ("
+                + $req.getLuggage().getWeightKg() + " kg > 23 kg permitidos).");
+end
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regla 5: AssignEmergencyExitSeatToYoungAdults
+// Condición : Pasajero entre 18 y 40 años, preferencia "Any" y asiento de
+//             emergencia disponible en el vuelo
+// Acción    : Asignar el asiento de salida de emergencia y marcarlo como ocupado
+// ─────────────────────────────────────────────────────────────────────────────
+rule "AssignEmergencyExitSeatToYoungAdults"
+    when
+        $req  : BookingRequest(
+                    passenger.age >= 18,
+                    passenger.age <= 40,
+                    passenger.seatPreference == "Any",
+                    flight.emergencyExitSeatAvailable == true
+                )
+        $resp : BookingResponse()
+    then
+        $resp.setSeatAssigned("Emergency-Exit-Row");
+        $req.getFlight().setEmergencyExitSeatAvailable(false);
+        $resp.addMessage("Regla 5 activada: Asiento de salida de emergencia asignado a "
+                + $req.getPassenger().getName() + " (" + $req.getPassenger().getAge() + " años).");
+        update($req);
+end
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regla 6: CompensationForExtremeDelays
+// Condición : Vuelo con retraso mayor a 180 minutos (3 horas)
+// Acción    : Otorgar compensación de $200 al pasajero
+// ─────────────────────────────────────────────────────────────────────────────
+rule "CompensationForExtremeDelays"
+    when
+        $req  : BookingRequest(flight.delayMinutes > 180)
+        $resp : BookingResponse()
+    then
+        $resp.setCompensation(200.0);
+        $resp.addMessage("Regla 6 activada: Compensación de $200 otorgada por retraso extremo de "
+                + $req.getFlight().getDelayMinutes() + " minutos.");
+end
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regla 7: ExtraLoyaltyPointsForLongFlights
+// Condición : Pasajero con membresía distinta a "Basic" en un vuelo > 5 horas
+// Acción    : Agregar 500 puntos de lealtad adicionales
+// ─────────────────────────────────────────────────────────────────────────────
+rule "ExtraLoyaltyPointsForLongFlights"
+    when
+        $req  : BookingRequest(
+                    passenger.membershipStatus != "Basic",
+                    flight.durationHours > 5
+                )
+        $resp : BookingResponse()
+    then
+        $resp.setBonusLoyaltyPoints($resp.getBonusLoyaltyPoints() + 500);
+        $resp.addMessage("Regla 7 activada: 500 puntos de lealtad adicionales por vuelo largo ("
+                + $req.getFlight().getDurationHours() + " horas) y membresía "
+                + $req.getPassenger().getMembershipStatus() + ".");
+end
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regla 8: RestrictLuggageOnShortFlights
+// Condición : Equipaje mayor a 15 kg en un vuelo de menos de 2 horas
+// Acción    : Marcar el equipaje como no permitido
+// ─────────────────────────────────────────────────────────────────────────────
+rule "RestrictLuggageOnShortFlights"
+    when
+        $req  : BookingRequest(
+                    luggage.weightKg > 15,
+                    flight.durationHours < 2
+                )
+        $resp : BookingResponse()
+    then
+        $resp.setLuggageAllowed(false);
+        $resp.addMessage("Regla 8 activada: Equipaje NO permitido. Peso " + $req.getLuggage().getWeightKg()
+                + " kg excede el límite de 15 kg para vuelos cortos (< 2 horas).");
+end
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regla 9: VipLoungeAccessForPlatinumMembers
+// Condición : Pasajero con membresía "Platinum"
+// Acción    : Otorgar acceso al salón VIP
+// ─────────────────────────────────────────────────────────────────────────────
+rule "VipLoungeAccessForPlatinumMembers"
+    when
+        $req  : BookingRequest(passenger.membershipStatus == "Platinum")
+        $resp : BookingResponse()
+    then
+        $resp.setVipLoungeAccess(true);
+        $resp.addMessage("Regla 9 activada: Acceso al salón VIP otorgado a "
+                + $req.getPassenger().getName() + " por membresía Platinum.");
+end
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Regla 10: PreferentialSeatForFamilies
+// Condición : Pasajero viajando con niños y sin preferencia específica de asiento
+// Acción    : Asignar asiento preferencial para familias
+// ─────────────────────────────────────────────────────────────────────────────
+rule "PreferentialSeatForFamilies"
+    when
+        $req  : BookingRequest(
+                    passenger.travelingWithChildren == true,
+                    passenger.seatPreference == "Any"
+                )
+        $resp : BookingResponse(seatAssigned == null)
+    then
+        $resp.setSeatAssigned("FamilyZone-A1");
+        $resp.addMessage("Regla 10 activada: Asiento familiar FamilyZone-A1 asignado a "
+                + $req.getPassenger().getName() + " por viajar con niños.");
+end

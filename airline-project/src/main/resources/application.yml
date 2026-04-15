@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: airline-drools-rules
+
+server:
+  port: 8080
+
+# Logging para ver qué reglas se ejecutan en consola
+logging:
+  level:
+    com.udea.droolrules: DEBUG
+    org.drools: WARN
+    org.kie: WARN
